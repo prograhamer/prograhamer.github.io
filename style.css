@@ -12,7 +12,10 @@ body {
   top: 0;
   bottom: 0;
   margin: auto;
-  background-image: radial-gradient(#ed88ef, #ef88bd, #ba88ef);
+  background:
+    linear-gradient(30deg, rgba(237, 136, 239, 0), rgba(237, 136, 239, 1)),
+    linear-gradient(140deg, rgba(239, 136, 189, 0), rgba(239, 136, 189, 1)),
+    linear-gradient(240deg, rgba(186, 136, 239, 0), rgba(186, 136, 239, 1));
 }
 
 .gradient img {
