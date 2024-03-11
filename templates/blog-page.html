@@ -1,5 +1,12 @@
 {% extends "base.html" %}
 
+{% block meta %}
+<meta property="og:title" content="{{ page.title }} - PinkFalcon" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="{{ config.base_url }}/{{ page.slug }}" />
+<meta property="og:article:published_time" context="{{ page.date }}" />
+{% endblock meta %}
+
 {% block content %}
 <h1 class="title">
   {{ page.title }}
