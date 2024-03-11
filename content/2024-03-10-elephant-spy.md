@@ -1,5 +1,6 @@
 +++
 title = "My First Post^H^H^H^HBrowser Extension"
+description = "Experiments with tooting elephants"
 date = "2024-03-10"
 +++
 

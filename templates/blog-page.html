@@ -2,16 +2,22 @@
 
 {% block meta %}
 <meta property="og:title" content="{{ page.title }} - PinkFalcon" />
+<meta property="og:description" content="{{ page.description }}" />
 <meta property="og:type" content="article" />
 <meta property="og:url" content="{{ config.base_url }}/{{ page.slug }}" />
 <meta property="og:article:published_time" context="{{ page.date }}" />
 {% endblock meta %}
 
 {% block content %}
-<h1 class="title">
-  {{ page.title }}
-</h1>
-<p class="subtitle"><strong>{{ page.date }}</strong></p>
+<div class="front-matter">
+	<h1 class="title">
+		{{ page.title }}
+	</h1>
+	<div class="subtitle">
+		<div class="description">{{ page.description }}</div>
+		<div class="date">{{ page.date }}</div>
+	</div>
+</div>
 <main>
 {{ page.content | safe }}
 </main>

@@ -9,8 +9,12 @@ img.doot {
 	height: 120px;
 }
 
-div.toc li {
-	list-style: none;
+div.toc ul {
+	padding: 0;
+	
+	li {
+		list-style: none;
+	}
 }
 
 div.content {
@@ -57,6 +61,33 @@ h2 {
 h3 {
 	font-size: 1.2em;
 	font-weight: 600;
+}
+
+p.date {
+	font-style: italic;
+}
+
+div.front-matter {
+	background-color: rgba(245, 245, 245, 0.6);
+	margin: 0 -8px;
+	padding: 16px 16px 16px 8px;
+}
+
+div.subtitle {
+	display: flex;
+	flex-direction: row;
+	justify-content: space-between;
+	font-weight: 200;
+	font-size: 1.1rem;
+
+	.description {
+		font-weight: 400;
+		font-size: 1.1rem;
+	}
+
+	.date {
+		font-style: italic;
+	}
 }
 
 a {
