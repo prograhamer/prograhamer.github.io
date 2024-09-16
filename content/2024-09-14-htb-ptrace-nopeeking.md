@@ -7,6 +7,10 @@ I'm going to try my first write up for a Hack The Box challenge, because I thoug
 
 ## Introduction
 
+This genre of challenge involves reverse engineering an executable to find a flag. The flag is typically user input that triggers some success condition. This input could be provided to a remote connection or, in the case of this exercise, no remote connection is required, meaning that the flag must be encoded in the executable itself somehow.
+
+I tend to start with an open mind, more considering what the program does than what might constitute its flag.
+
 The zip archive downloaded from Hack The Box for this challenge contains a single file: a Linux x86_64 executable named `nopeeking`. The executable is stripped, so no hints from symbol names.
 
 On startup, the program calls `mmap` to set up some shared memory for IPC, and then calls `fork` to create a child process.
@@ -159,13 +163,33 @@ The `<two byte tag>` is the tag referenced in the previous section.
 
 This structure makes these procedures more challenging to disassemble, given the disassembler (quite reasonably) assumes that the data immediately following the `ud2` instruction will be more instructions, but it is actually some arbitrary data.
 
-The disassembly in IDA looks sensible from the entry point until the first `ud2` instruction is encountered. At best, the IDA output yields isolated blocks where it's hard to see where the execution will resume after the tracer makes the `ptrace` call to continue the tracee. At worst, since the tag is being interpreted as part of the instructions, it can be interpreted as part of an instruction  whose length isn't 2 bytes, leading to all subsequent instructions being incorrect!
+The disassembly in the free version of IDA looks sensible from the entry point until the first `ud2` instruction is encountered. At best, the IDA output yields isolated blocks where it's hard to see where the execution will resume after the tracer makes the `ptrace` call to continue the tracee. At worst, since the tag is being interpreted as part of the instructions, it can be interpreted as part of an instruction  whose length isn't 2 bytes, leading to the disassembly of subsequent instructions being incorrect!
 
-In order to disassemble the code in these functions, I wrote a python script using the [iced-x86](https://github.com/icedland/iced) python bindings.
+For example, consider the instructions following the `ud2` instruction at address `0x1296` in the following disassembly from `objdump`:
+```
+1296: 0f 0b                        	ud2
+1298: 55                           	push	rbp
+1299: 4f c7 45 dc 00 00 00 00      	mov	qword ptr [r13 - 36], 0
+12a1: 48 8b 05 70 0e 20 00         	mov	rax, qword ptr [rip + 2100848] # 0x202118
+...
+```
+
+After the bytes `0f 0b` at address `0x1298` (the `ud2` instruction), the next instruction is `push rbp` (opcode `0x55`) and after that we have `mov qword ptr [r13 - 36], 0`, whose first byte is `0x4f`. Note that after a `ud2` instruction we expect a two byte "tag" to inform the tracer's code path when the tracee stops, and `0x4f55` is one value explicitly tested for by the function that interacts with the tracee.
+
+What we actually want for the disassembly at these addresses looks more like the following:
+```
+1296: 0f 0b                         ud2
+1998: 55 4f                         [TAG, do not disassemble]     
+129A: c7 45 dc 00 00 00 00          mov dword ptr [rbp-24h], 0
+12A1: 48 8b 05 70 0e 20 00          mov rax, qword ptr [rip + 2100848] # 0x202118
+...
+```
+
+In order to disassemble the code in these functions, I wrote a python script using the [iced-x86](https://github.com/icedland/iced) python bindings. The script served two purposes for me, both disassembling the code as it is executed, but also making it clear which "tag" is seen by the tracer process after each `ud2` instruction, to be able to more easily reconstruct the entire code executed as a sequence of instructions.
 
 To do this, I first followed the flow in both flag flag validation functions (parent and child) to find the first `ud2` instruction executed in the initial state. With these addresses, I could write a python script to replicate the implementation seen in the tracer process. That is:
 - Disassemble until encountering a `ud2` instruction
-- Fetch the tag
+- Fetch and print the tag
 - Advance the instruction pointer by 4 bytes
 - Continue disassembling from the new location
 - Terminate on encountering a `ret` instruction
@@ -182,6 +206,7 @@ formatter = Formatter(FormatterSyntax.MASM)
 formatter.branch_leading_zeros = False
 formatter.space_after_operand_separator = True
 
+// These addresses are the entry points to the `ud2`-heavy flows
 for rip in (0x1047, 0x127A):
     cont = True
 
