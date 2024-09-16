@@ -13,7 +13,7 @@ I tend to start with an open mind, more considering what the program does than w
 
 The zip archive downloaded from Hack The Box for this challenge contains a single file: a Linux x86_64 executable named `nopeeking`. The executable is stripped, so no hints from symbol names.
 
-On startup, the program calls `mmap` to set up some shared memory for IPC, and then calls `fork` to create a child process.
+On startup, the program calls `mmap` to set up some shared memory for interprocess communication, and then calls `fork` to create a child process.
 
 The child process sets up bidirectional `ptrace` attachment by triggering the parent process to
 trace it, and then attaching to the parent process, writing its own pid to the parent process (to
@@ -163,7 +163,7 @@ The `<two byte tag>` is the tag referenced in the previous section.
 
 This structure makes these procedures more challenging to disassemble, given the disassembler (quite reasonably) assumes that the data immediately following the `ud2` instruction will be more instructions, but it is actually some arbitrary data.
 
-The disassembly in the free version of IDA looks sensible from the entry point until the first `ud2` instruction is encountered. At best, the IDA output yields isolated blocks where it's hard to see where the execution will resume after the tracer makes the `ptrace` call to continue the tracee. At worst, since the tag is being interpreted as part of the instructions, it can be interpreted as part of an instruction  whose length isn't 2 bytes, leading to the disassembly of subsequent instructions being incorrect!
+The disassembly in the free version of IDA[^ida] looks sensible from the entry point until the first `ud2` instruction is encountered. At best, the IDA output yields isolated blocks where it's hard to see where the execution will resume after the tracer makes the `ptrace` call to continue the tracee. At worst, since the tag is being interpreted as part of the instructions, it can be interpreted as part of an instruction  whose length isn't 2 bytes, leading to the disassembly of subsequent instructions being incorrect!
 
 For example, consider the instructions following the `ud2` instruction at address `0x1296` in the following disassembly from `objdump`:
 ```
@@ -379,3 +379,5 @@ print(result)
 This script loads the data directly from the `nopeeking` executable, then applies the inverse of the transform function described above, and finally prints out the flag.
 
 [^ud2]: [https://www.felixcloutier.com/x86/ud](https://www.felixcloutier.com/x86/ud)
+
+[^ida]: [https://hex-rays.com/ida-free/](https://hex-rays.com/ida-free/)
