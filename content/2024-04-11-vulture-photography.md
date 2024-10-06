@@ -2,6 +2,8 @@
 title = "Bird Photography"
 description = "Trying to figure out the basics"
 date = "2024-04-11"
+[taxonomies]
+categories = ["Birds", "Nature", "Photography"]
 +++
 
 For a couple of years now, I have been taking photographs of turkey vultures at some conservation areas relatively close to my home. At these conservation areas, there are cliffs, and you can often enjoy a view of the vultures soaring past at eye level and only 10-20m away.

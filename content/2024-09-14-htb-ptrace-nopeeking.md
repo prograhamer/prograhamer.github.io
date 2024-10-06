@@ -1,7 +1,9 @@
 +++
 title = "Hack The Box - PTRACE_NOPEEKING"
-description = "Hack The Box - Challenges - PTRACE_NOPEEKING"
+description = "A write-up for the Hack The Box reverse engineering challenge \"PTRACE_NOPEEKING\""
 date = "2024-09-15"
+[taxonomies]
+categories=["Hack The Box", "Reversing"]
 +++
 I'm going to try my first write up for a Hack The Box challenge, because I thought this one was cool!
 

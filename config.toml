@@ -13,6 +13,10 @@ generate_feed = true
 
 author = "prograhamer"
 
+taxonomies = [
+  {name = "categories", feed = true, render = true},
+]
+
 [markdown]
 # Whether to do syntax highlighting
 # Theme can be customised by setting the `highlight_theme` variable to a theme supported by Zola

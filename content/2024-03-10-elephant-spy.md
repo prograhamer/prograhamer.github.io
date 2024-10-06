@@ -2,6 +2,8 @@
 title = "My First Post^H^H^H^HBrowser Extension"
 description = "Experiments with tooting elephants"
 date = "2024-03-10"
+[taxonomies]
+categories = ["Programming", "Games"]
 +++
 
 Recently, I have played quite a lot of Ark Nova with friends on [boardgamearena.com](https://boardgamearena.com). For anyone who hasn't played it, it's a card-based zoo management game with a lot of replayability. There are a few random elements to the game setup and you need to tailor your strategy to the situation.

@@ -17,6 +17,13 @@
 		<div class="description">{{ page.description }}</div>
 		<div class="date">{{ page.date }}</div>
 	</div>
+  {% if page.taxonomies.categories %}
+  <ul class="categories">
+  {% for category in page.taxonomies.categories %}
+  <li><a href={{ get_taxonomy_url(kind="categories", name=category) }}>{{ category }}</a></li>
+  {% endfor %}
+  </ul>
+  {% endif %}
 </div>
 <main>
 {{ page.content | safe }}

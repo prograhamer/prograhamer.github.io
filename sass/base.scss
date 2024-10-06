@@ -83,8 +83,7 @@ div.subtitle {
   font-size: 1.1rem;
 
   .description {
-    font-weight: 400;
-    font-size: 1.1rem;
+    font-weight: 100;
   }
 
   .date {
@@ -190,5 +189,18 @@ div.footnote-definition {
   p {
     display: inline;
     margin-left: 1em;
+  }
+}
+
+ul.categories {
+  list-style: none;
+  padding: 0px;
+  margin-top: 1em;
+  margin-bottom: 0px;
+
+  li {
+    margin-right: 1em;
+    padding: 4px;
+    display: inline;
   }
 }
