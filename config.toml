@@ -1,6 +1,9 @@
 # The URL the site will be built for
 base_url = "https://pinkfalcon.ca"
 
+title = "PinkFalcon"
+description = "A place for me to write"
+
 # Whether to automatically compile all Sass files in the sass directory
 compile_sass = true
 
@@ -10,6 +13,7 @@ build_search_index = false
 minify_html = true
 
 generate_feed = true
+feed_filename = "rss.xml"
 
 author = "prograhamer"
 
