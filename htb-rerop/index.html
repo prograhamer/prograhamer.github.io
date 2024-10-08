@@ -1,0 +1,204 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta content="width=device-width,initial-scale=1" name=viewport><title>PinkFalcon</title><link href="https://pinkfalcon.ca/base.css?h=10ee9495e2400f4cd0af" rel=stylesheet><link title="RSS Feed" href=https://pinkfalcon.ca/rss.xml rel=alternate type=application/rss+xml><link title="Atom Feed" href=https://pinkfalcon.ca/atom.xml rel=alternate type=application/atom+xml><meta content="Hack The Box - ReRop - PinkFalcon" property=og:title><meta content='A write-up for the Hack The Box reverse engineering challenge "ReRop"' property=og:description><meta content=article property=og:type><meta content=https://pinkfalcon.ca/htb-rerop property=og:url><meta context=2024-10-06 property=og:article:published_time><body><div class=gradient><div class=falcon><img src=/images/falcon.png></div></div><div class=content><div class=front-matter><h1 class=title>Hack The Box - ReRop</h1><div class=subtitle><div class=description>A write-up for the Hack The Box reverse engineering challenge "ReRop"</div><div class=date>2024-10-06</div></div><ul class=categories><li><a href=https://pinkfalcon.ca/categories/hack-the-box/>Hack The Box</a><li><a href=https://pinkfalcon.ca/categories/reversing/>Reversing</a></ul></div><main><h2 id=introduction>Introduction</h2><p>The zip archive downloaded from Hack The Box contains a single file: a Linux x86_64 executable named <code>rerop</code>. The file is not stripped, so we get quite a lot of help from symbol names. It also isn't position independent, so we know the various sections from the binary will be loaded at addresses determined at compile time and not run time. This will become important later.<p>The <code>main</code> function is extremely simple in appearance:<ul><li>call <code>printf</code> to print a prompt to enter the flag<li>call <code>fgets</code> read user input into a static buffer <code>buf</code> (in the <code>.data</code> section)<li>call <code>strcspn</code> to find the first newline character, then strip it from the user input<li>call a function <code>check</code>, passing in <code>data</code> (another symbol in the <code>.data</code> section)<li>call <code>puts(buf)</code> to print out the user input (possibly modified by <code>check</code>)</ul><p>This leaves the <code>check</code> function as the most likely source of interest, both from its name and the absence of anything else interesting happening in <code>main</code>.<h2 id=the-check-function>The <code>check</code> function</h2><p>Looking into the <code>check</code> function, the Ghidra decompilation output is very misleading, and just shows the following:<pre class=language-c data-lang=c style=color:#1f1f1f;background-color:#f5f5f5><code class=language-c data-lang=c><span style=color:#668f14>void </span><span style=color:#c23f31>check</span><span>(</span><span style=color:#668f14>void</span><span>)
+</span><span>{
+</span><span>  </span><span style=color:#72ab00>return</span><span>;
+</span><span>}
+</span></code></pre><p>This is a case where decompilation can't really do much, because the function's implementation can't really be expressed in C. Examining the disassembly is much more illuminating:<pre class=language-asm data-lang=asm style=color:#1f1f1f;background-color:#f5f5f5><code class=language-asm data-lang=asm><span style=color:#c23f31>endbr64
+</span><span style=color:#72ab00>lea </span><span style=color:#c23f31>%(</span><span style=color:#5597d6>rdi</span><span style=color:#c23f31>)</span><span>, </span><span style=color:#c23f31>%</span><span style=color:#5597d6>rsp</span><span style=color:#7f8989> ; Intel: LEA RSP, [RDI]
+</span><span style=color:#72ab00>ret
+</span></code></pre><p>This function does do something a lot more significant than just returning, it replaces the stack pointer with the address passed in as the first argument. Reflecting on the challenge name, this makes a lot of sense, as this looks a lot like a stack pivot to set up a <abbr title="Return-Oriented Programming">ROP</abbr><sup class=footnote-reference><a href=#rop>1</a></sup> chain.<h2 id=return-oriented-programming>Return-oriented Programming</h2><p>It seems reasonable to give a quick overview of return-oriented programming here, before moving on with this write-up, for the sake of completeness.<p>In return-oriented programming, either the stack is overwritten, or the stack pointer itself is altered, to have the return pointer of a stack frame point to a so-called gadget. These gadgets are usually desired to be a short sequence of instructions to achieve a specific purpose, e.g. popping a value from the stack into a register, followed by a <code>ret</code> instruction. Because the stack is controlled, this means the return pointer used by the <code>ret</code> from a gadget can also be controlled, giving a way of executing an arbitrary chain of instructions only using the code that already exists within an executable.<p>This technique can be useful to bypass the non-executable stack protection that prevents an attacker from simply writing a shellcode to the stack and overwriting the return pointer of the current stack frame to jump into that shellcode. Since return-oriented programming only relies on execution of code that is already part of the program being hijacked, and that code must be executable for the program to work, this technique provides an elegant bypass for one of the early mitigations created against turning stack-based buffer overflows into arbitrary code execution.<p>In the case of the <code>rerop</code> executable, the stack pointer is modified to pointer instead to some static data contained in the binary's <code>.data</code> section. We can analyze this data to establish the actual code execution by treating any <code>pop</code> instruction as consuming data from the "stack", and treating <code>ret</code> as special case of <code>pop %rip</code>.<h2 id=linearizing-the-rop-chain>Linearizing the ROP Chain</h2><p>What we have in the stack, after the pivot to the address of the <code>data</code> symbol, is something like the following (truncated to match up with a functional block as shown later):<pre style=color:#1f1f1f;background-color:#f5f5f5><code><span>0x4c5100: 0x450ec7
+</span><span>0x4c5108: 0x000065
+</span><span>0x4c5110: 0x401eef
+</span><span>0x4c5118: 0x000000
+</span><span>0x4c5120: 0x409f1e
+</span><span>0x4c5128: 0x000001
+</span><span>0x4c5130: 0x458142
+</span><span>0x4c5138: 0x000000
+</span><span>0x4c5140: 0x41aab6
+</span><span>0x4c5148: 0x451fe0
+</span><span>0x4c5150: 0x450ec7
+</span><span>0x4c5158: 0x001198
+</span><span>0x4c5160: 0x452000
+</span></code></pre><p>The structure of this is fairly simple, it's a list of return pointers interlaced with data that is consumed from the stack by the instructions referenced by the return address, before that sequence of instructions invokes another return. E.g. the instructions at <code>0x450ec7</code> (the first return pointer) are <code>pop %rax; ret</code>, so the first gadget sets <code>rax</code> equal to <code>0x65</code> (since that is the next entry on the stack after the return address).<p>What I'd like to see is the actual instructions executed at each return address, in sequence, including the register assignments using <code>pop</code> instructions. In order to achieve this, without having to manually reference every return address, I wrote a short python script to "linearize" the chain into a more comprehensible form. The program I came up with is below. It loads the binary using <code>ELF</code> class from <a rel="nofollow noreferrer" href=https://github.com/Gallopsled/pwntools>pwntools</a> to allow looking up data for symbols and from arbitrary addresses in the binary. It uses the same disassembly library (<a rel="nofollow noreferrer" href=https://github.com/icedland/iced>iced_x86</a>) as I used in the <a href=https://pinkfalcon.ca/htb-ptrace-nopeeking/>PTRACE_NOPEEKING</a> challenge.<pre class=language-python data-lang=python style=color:#1f1f1f;background-color:#f5f5f5><code class=language-python data-lang=python><span style=color:#7f8989>#!/usr/bin/env python3
+</span><span>
+</span><span style=color:#72ab00>from </span><span>iced_x86 </span><span style=color:#72ab00>import </span><span>Decoder, Formatter, FormatterSyntax, Mnemonic, OpCodeOperandKind
+</span><span>
+</span><span style=color:#72ab00>from </span><span>pwnlib.elf.elf </span><span style=color:#72ab00>import </span><span style=color:#5597d6>ELF
+</span><span style=color:#72ab00>from </span><span>pwnlib.util.packing </span><span style=color:#72ab00>import </span><span>u64
+</span><span>
+</span><span style=color:#72ab00>def </span><span style=color:#c23f31>main</span><span>():
+</span><span>    formatter </span><span style=color:#72ab00>= </span><span style=color:#5597d6>Formatter</span><span>(FormatterSyntax.</span><span style=color:#5597d6>GAS</span><span>)
+</span><span>    formatter.branch_leading_zeros </span><span style=color:#72ab00>= </span><span style=color:#b3933a>False
+</span><span>    formatter.space_after_operand_separator </span><span style=color:#72ab00>= </span><span style=color:#b3933a>True
+</span><span>
+</span><span>    elf </span><span style=color:#72ab00>= </span><span style=color:#5597d6>ELF</span><span>(</span><span style=color:#d07711>"rerop"</span><span>)
+</span><span>
+</span><span>    </span><span style=color:#7f8989># Initialize the stack pointer to the addres of `data`
+</span><span>    stack_pointer </span><span style=color:#72ab00>= </span><span>elf.sym[</span><span style=color:#d07711>"data"</span><span>]
+</span><span>
+</span><span>    valid </span><span style=color:#72ab00>= </span><span style=color:#b3933a>True
+</span><span>
+</span><span>    </span><span style=color:#72ab00>while </span><span>valid:
+</span><span>        </span><span style=color:#7f8989># Get the current return address from the stack pointer,
+</span><span>        return_addr </span><span style=color:#72ab00>= </span><span style=color:#5597d6>u64</span><span>(elf.</span><span style=color:#5597d6>read</span><span>(stack_pointer, </span><span style=color:#b3933a>8</span><span>))
+</span><span>        </span><span style=color:#7f8989># Imitate a `ret` by consuming the data from the stack
+</span><span>        stack_pointer </span><span style=color:#72ab00>+= </span><span style=color:#b3933a>8
+</span><span>
+</span><span>        </span><span style=color:#7f8989># Read some data from the return address, 0x200 is arbitrary but proved plenty for this to work
+</span><span>        gadget </span><span style=color:#72ab00>= </span><span>elf.</span><span style=color:#5597d6>read</span><span>(return_addr, </span><span style=color:#b3933a>0x200</span><span>)
+</span><span>
+</span><span>        decoder </span><span style=color:#72ab00>= </span><span style=color:#5597d6>Decoder</span><span>(</span><span style=color:#b3933a>64</span><span>, gadget, </span><span style=color:#5597d6>ip</span><span style=color:#72ab00>=</span><span>return_addr)
+</span><span>
+</span><span>        </span><span style=color:#72ab00>for </span><span>instr </span><span style=color:#72ab00>in </span><span>decoder:
+</span><span>            </span><span style=color:#72ab00>if </span><span>instr.mnemonic </span><span style=color:#72ab00>== </span><span>Mnemonic.</span><span style=color:#5597d6>INVALID</span><span>:
+</span><span>                </span><span style=color:#7f8989># Bail on encoutering the first invalid instruction
+</span><span>                </span><span style=color:#7f8989># Might be nicer to bail on `syscall` when %rax = 0x3c (exit), but this works just fine
+</span><span>                valid </span><span style=color:#72ab00>= </span><span style=color:#b3933a>False
+</span><span>                </span><span style=color:#72ab00>break
+</span><span>
+</span><span>            finstr </span><span style=color:#72ab00>= </span><span>formatter.</span><span style=color:#5597d6>format</span><span>(instr)
+</span><span>
+</span><span>            </span><span style=color:#72ab00>if </span><span>instr.mnemonic </span><span style=color:#72ab00>== </span><span>Mnemonic.</span><span style=color:#5597d6>POP</span><span>:
+</span><span>                </span><span style=color:#7f8989># Get the data from the stack
+</span><span>                data </span><span style=color:#72ab00>= </span><span>elf.</span><span style=color:#5597d6>read</span><span>(stack_pointer, </span><span style=color:#b3933a>8</span><span>)
+</span><span>                </span><span style=color:#7f8989># Imitate a `pop` by consuming data from the stack
+</span><span>                stack_pointer </span><span style=color:#72ab00>+= </span><span style=color:#b3933a>8
+</span><span>
+</span><span>                </span><span style=color:#7f8989># In theory we could have pops of various lengths, not just full 64 bit registers,
+</span><span>                </span><span style=color:#7f8989># but in practice only pops of 64 bit length were used
+</span><span>                val </span><span style=color:#72ab00>= </span><span style=color:#5597d6>u64</span><span>(data)
+</span><span>
+</span><span>                </span><span style=color:#b39f04>print</span><span>(</span><span style=color:#668f14>f</span><span style=color:#d07711>'0x</span><span>{instr.ip</span><span style=color:#b3933a>:06x</span><span>}</span><span style=color:#d07711>: </span><span>{finstr}</span><span style=color:#aeb52b>\t</span><span style=color:#d07711># 0x</span><span>{val</span><span style=color:#b3933a>:02x</span><span>}</span><span style=color:#d07711>'</span><span>)
+</span><span>            </span><span style=color:#72ab00>elif </span><span>instr.mnemonic </span><span style=color:#72ab00>== </span><span>Mnemonic.</span><span style=color:#5597d6>RET</span><span>:
+</span><span>                </span><span style=color:#b39f04>print</span><span>(</span><span style=color:#668f14>f</span><span style=color:#d07711>'0x</span><span>{instr.ip</span><span style=color:#b3933a>:06x</span><span>}</span><span style=color:#d07711>: </span><span>{finstr}</span><span style=color:#aeb52b>\t\t</span><span style=color:#d07711># rsp = 0x</span><span>{stack_pointer</span><span style=color:#b3933a>:02x</span><span>}</span><span style=color:#d07711>'</span><span>)
+</span><span>                </span><span style=color:#72ab00>break
+</span><span>            </span><span style=color:#72ab00>else</span><span>:
+</span><span>                </span><span style=color:#b39f04>print</span><span>(</span><span style=color:#668f14>f</span><span style=color:#d07711>'0x</span><span>{instr.ip</span><span style=color:#b3933a>:06x</span><span>}</span><span style=color:#d07711>: </span><span>{finstr}</span><span style=color:#d07711>'</span><span>)
+</span><span>
+</span><span>
+</span><span style=color:#72ab00>if </span><span style=color:#a2a001>__name__ </span><span style=color:#72ab00>== </span><span style=color:#d07711>"__main__"</span><span>:
+</span><span>    </span><span style=color:#5597d6>main</span><span>()
+</span></code></pre><p>The basic implementation is as follows:<ul><li>Read the initial stack pointer value from the symbol <code>data</code> in the binary<li>Do the following in a loop: <ul><li>Read the return address from the stack pointer, consuming 8 bytes from the "stack"<li>Read the instruction data for the gadget referenced by the return pointer<li>Decompile the instruction data, printing the instructions, with a couple of special cases: <ul><li>If the instruction is invalid, terminate the loop<li>If the instruction is <code>pop</code>, read 8 bytes from the "stack" and include the popped value alongside the affected register<li>If the instruction is <code>ret</code>, stop interpreting instructions from the gadgets</ul></ul></ul><p>The output of this program is something like the following (truncated to show the same block from the stack data listed above):<pre style=color:#1f1f1f;background-color:#f5f5f5><code><span>0x450ec7: pop %rax	# 0x65
+</span><span>0x450ec8: ret		# rsp = 0x4c5110
+</span><span>0x401eef: pop %rdi	# 0x00
+</span><span>0x401ef0: ret		# rsp = 0x4c5120
+</span><span>0x409f1e: pop %rsi	# 0x01
+</span><span>0x409f1f: ret		# rsp = 0x4c5130
+</span><span>0x458142: pop %rdx	# 0x00
+</span><span>0x458143: ret		# rsp = 0x4c5140
+</span><span>0x41aab6: syscall
+</span><span>0x41aab8: ret		# rsp = 0x4c5148
+</span><span>0x451fe0: mov %rax, %rdi
+</span><span>0x451fe3: ret		# rsp = 0x4c5150
+</span><span>0x450ec7: pop %rax	# 0x1198
+</span><span>0x450ec8: ret		# rsp = 0x4c5160
+</span><span>0x452000: mov %rax, %rsi
+</span><span>0x452003: xor %rbx, %rbx
+</span><span>0x452006: test %rdi, %rdi
+</span><span>0x452009: cmovs %rsi, %rbx
+</span><span>0x45200d: add %rbx, %rsp
+</span><span>0x452010: ret		# rsp = 0x4c5168
+</span><span>...
+</span></code></pre><p>This gives a good example of how the program flow works. By using <code>pop</code> instructions, the values of each register can be modified by using the data on the stack. Comparing this with the raw stack data, you can see the addresses on the left correlate to the return addresses in the stack data, as well as the comments indicating register assignments matching up with the data on the stack immediately following the return pointer to that gadget.<p>This particular block calls the <code>ptrace</code><sup class=footnote-reference><a href=#ptrace>2</a></sup> system call, with the request <code>PTRACE_TRACEME</code>. The value of <code>rax</code> is the system call number, and there is a good reference for the register values for specific system calls at <a rel="nofollow noreferrer" href=https://x64.syscall.sh/>https://x64.syscall.sh/</a>.<p>There is another really interesting thing about this code, in that effectively performs a conditional jump, even though there are no <code>jmp</code>/<code>jcc</code> instructions present. After the system call, its return value is stored in <code>rdi</code>, and an offset of <code>0x1198</code> is stored in <code>rax</code>. The code at <code>0x452000</code> zeroes the value in <code>rbx</code>, tests the value in <code>rdi</code> (the return value of <code>ptrace</code>) and if the sign bit is set, sets the value of <code>rbx</code> to be the offset. The instruction <code>add %rbx, %rsp</code> is then either <code>add $0, %rsp</code> (a no-op) or <code>addr $0x1198, %rsp</code>, which is effectively a jump, given the next instructions are determined by the value on the stack. The last <code>ret</code> has a comment listing its unmodified stack pointer address - this is the next gadget address if the condition didn't match. If the sign bit was set and <code>cmovs</code> set the value of <code>rbx</code> to the offset <code>0x1198</code>, then the next gadget address would be <code>0x4c5168 + 0x1198 = 0x4c6300</code>. The instructions executed on this branch can be found by finding the <code>ret</code> whose <code>rsp</code> value is <code>0x4c6300</code>.<p>This address has the following breakdown in the program output:<pre style=color:#1f1f1f;background-color:#f5f5f5><code><span>0x450ec7: pop %rax	# 0x706f4e6d31335b1b
+</span><span>0x450ec8: ret		# rsp = 0x4c6310
+</span><span>0x458142: pop %rdx	# 0x4c57e8
+</span><span>0x458143: ret		# rsp = 0x4c6320
+</span><span>0x419ad8: mov %rax, (%rdx)
+</span><span>0x419adb: ret		# rsp = 0x4c6328
+</span><span>0x450ec7: pop %rax	# 0xa6d305b1b65
+</span><span>0x450ec8: ret		# rsp = 0x4c6338
+</span><span>0x458142: pop %rdx	# 0x4c57f0
+</span><span>0x458143: ret		# rsp = 0x4c6348
+</span><span>0x419ad8: mov %rax, (%rdx)
+</span><span>0x419adb: ret		# rsp = 0x4c6350
+</span><span>0x450ec7: pop %rax	# 0x01
+</span><span>0x450ec8: ret		# rsp = 0x4c6360
+</span><span>0x401eef: pop %rdi	# 0x01
+</span><span>0x401ef0: ret		# rsp = 0x4c6370
+</span><span>0x409f1e: pop %rsi	# 0x4c57e8
+</span><span>0x409f1f: ret		# rsp = 0x4c6380
+</span><span>0x458142: pop %rdx	# 0x0e
+</span><span>0x458143: ret		# rsp = 0x4c6390
+</span><span>0x41aab6: syscall
+</span><span>0x41aab8: ret		# rsp = 0x4c6398
+</span><span>0x450ec7: pop %rax	# 0x3c
+</span><span>0x450ec8: ret		# rsp = 0x4c63a8
+</span><span>0x401eef: pop %rdi	# 0x01
+</span><span>0x401ef0: ret		# rsp = 0x4c63b8
+</span><span>0x41aab6: syscall
+</span><span>0x41aab8: ret		# rsp = 0x4c63c0
+</span></code></pre><p>This stores a string at <code>0x4c57e8</code>, then calls the system call <code>write</code> to write the string to standard output (file descriptor 1), and finally calls the system call <code>exit</code> with status <code>1</code> (failure). In summary it is pretty close to the following:<pre class=language-c data-lang=c style=color:#1f1f1f;background-color:#f5f5f5><code class=language-c data-lang=c><span style=color:#7f8989>// ANSI control sequences to set colour to red before text, reset after
+</span><span style=color:#7f8989>// Prints the text "Nope" in red to the terminal
+</span><span style=color:#5597d6>puts</span><span>(</span><span style=color:#d07711>"</span><span style=color:#aeb52b>\x1b</span><span style=color:#d07711>[31mNope</span><span style=color:#aeb52b>\x1b</span><span style=color:#d07711>[0m"</span><span>);
+</span><span style=color:#5597d6>exit</span><span>(</span><span style=color:#b3933a>1</span><span>);
+</span></code></pre><p>This makes it pretty clear that any jump to this address is going to be an indicator of invalid input or state.<h2 id=finding-the-flag>Finding the Flag</h2><p>Now we understand the basic operation of the ROP chain, including the potential for conditional jumps, we need to figure out what the correct flag input should be. Thankfully, the process applied here is very repetitive, so not every instruction needs to be read and understood!<p>The basic flag validation block to process a single character looks like the following:<pre style=color:#1f1f1f;background-color:#f5f5f5><code><span>0x401eef: pop %rdi	# 0x4c7820
+</span><span>0x401ef0: ret		# rsp = 0x4c5188
+</span><span>0x450ec7: pop %rax	# 0x19
+</span><span>0x450ec8: ret		# rsp = 0x4c5198
+</span><span>0x451ff0: add %rax, %rdi
+</span><span>0x451ff3: ret		# rsp = 0x4c51a0
+</span><span>0x451fe8: mov %rdi, %rax
+</span><span>0x451feb: ret		# rsp = 0x4c51a8
+</span><span>0x45202f: movzbq (%rax), %rax
+</span><span>0x452033: ret		# rsp = 0x4c51b0
+</span><span>0x451fe0: mov %rax, %rdi
+</span><span>0x451fe3: ret		# rsp = 0x4c51b8
+</span><span>0x450ec7: pop %rax	# 0x19
+</span><span>0x450ec8: ret		# rsp = 0x4c51c8
+</span><span>0x451ff0: add %rax, %rdi
+</span><span>0x451ff3: ret		# rsp = 0x4c51d0
+</span><span>0x450ec7: pop %rax	# 0x05
+</span><span>0x450ec8: ret		# rsp = 0x4c51e0
+</span><span>0x451ff8: xor %rax, %rdi
+</span><span>0x451ffb: ret		# rsp = 0x4c51e8
+</span><span>0x450ec7: pop %rax	# 0x6e
+</span><span>0x450ec8: ret		# rsp = 0x4c51f8
+</span><span>0x451fec: sub %rax, %rdi
+</span><span>0x451fef: ret		# rsp = 0x4c5200
+</span><span>0x452011: mov $1, %esi
+</span><span>0x452016: test %rdi, %rdi
+</span><span>0x452019: cmovne %rsi, %rdx
+</span><span>0x45201d: ret		# rsp = 0x4c5208
+</span></code></pre><p>First, it loads the address of <code>buf</code> (the user input) into <code>rdi</code>, then it adds <code>0x19</code> to the address, then it loads a single byte from the address into <code>rax</code>, and moves it into <code>rdi</code>. Next, it adds <code>0x19</code> to the character value, xors it with <code>0x05</code>, then subtracts <code>0x6e</code>. Finally, it tests if the value after processing is zero, and if not it sets <code>rdx</code> to <code>1</code>.<p>This pattern repeats with different character indexes and subtraction values until the final test of validity is just to ensure that <code>rdx</code> is zero.<p>By extracting the subtraction value for each offset, the flag input can be generated. The following python script contains all extracted offsets and the value in the final subtraction, then applies the inverse of the transformation to find each character's correct value (note the mapping of <code>0x19</code> to <code>0x6e</code> as demonstrated in the example):<pre class=language-python data-lang=python style=color:#1f1f1f;background-color:#f5f5f5><code class=language-python data-lang=python><span style=color:#7f8989>#!/usr/bin/env python3
+</span><span>
+</span><span style=color:#72ab00>from </span><span>operator </span><span style=color:#72ab00>import </span><span>xor
+</span><span>
+</span><span>sub_vals </span><span style=color:#72ab00>= </span><span>{
+</span><span>        </span><span style=color:#b3933a>0x00</span><span>: </span><span style=color:#b3933a>0x4d</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x01</span><span>: </span><span style=color:#b3933a>0x50</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x02</span><span>: </span><span style=color:#b3933a>0x41</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x03</span><span>: </span><span style=color:#b3933a>0x7b</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x04</span><span>: </span><span style=color:#b3933a>0x5e</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x05</span><span>: </span><span style=color:#b3933a>0x3c</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x06</span><span>: </span><span style=color:#b3933a>0x6a</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x07</span><span>: </span><span style=color:#b3933a>0x5e</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x08</span><span>: </span><span style=color:#b3933a>0x62</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x09</span><span>: </span><span style=color:#b3933a>0x65</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x0a</span><span>: </span><span style=color:#b3933a>0x3b</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x0b</span><span>: </span><span style=color:#b3933a>0x5b</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x0d</span><span>: </span><span style=color:#b3933a>0x64</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x0c</span><span>: </span><span style=color:#b3933a>0x6e</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x0e</span><span>: </span><span style=color:#b3933a>0x73</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x0f</span><span>: </span><span style=color:#b3933a>0x4a</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x10</span><span>: </span><span style=color:#b3933a>0x81</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x11</span><span>: </span><span style=color:#b3933a>0x75</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x12</span><span>: </span><span style=color:#b3933a>0x67</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x13</span><span>: </span><span style=color:#b3933a>0x6f</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x14</span><span>: </span><span style=color:#b3933a>0x67</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x15</span><span>: </span><span style=color:#b3933a>0x71</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x16</span><span>: </span><span style=color:#b3933a>0x43</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x17</span><span>: </span><span style=color:#b3933a>0x6c</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x18</span><span>: </span><span style=color:#b3933a>0x72</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x19</span><span>: </span><span style=color:#b3933a>0x6e</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x1a</span><span>: </span><span style=color:#b3933a>0x48</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x1b</span><span>: </span><span style=color:#b3933a>0x74</span><span>,
+</span><span>        </span><span style=color:#b3933a>0x1c</span><span>: </span><span style=color:#b3933a>0x9c</span><span>,
+</span><span>}
+</span><span>
+</span><span>flag_bytes </span><span style=color:#72ab00>= </span><span>[</span><span style=color:#b3933a>0</span><span>]</span><span style=color:#72ab00>*</span><span style=color:#b3933a>0x1d
+</span><span>
+</span><span style=color:#72ab00>for </span><span>i </span><span style=color:#72ab00>in </span><span style=color:#b39f04>range</span><span>(</span><span style=color:#b3933a>0x1d</span><span>):
+</span><span>    flag_bytes[i] </span><span style=color:#72ab00>= </span><span style=color:#5597d6>xor</span><span>(sub_vals[i], </span><span style=color:#b3933a>0x05</span><span>) </span><span style=color:#72ab00>- </span><span>i
+</span><span>
+</span><span>flag </span><span style=color:#72ab00>= </span><span style=color:#d07711>''</span><span>.</span><span style=color:#5597d6>join</span><span>([</span><span style=color:#b39f04>chr</span><span>(x) </span><span style=color:#72ab00>for </span><span>x </span><span style=color:#72ab00>in </span><span>flag_bytes])
+</span><span style=color:#b39f04>print</span><span>(flag)
+</span></code></pre><p>Running this will output the correct flag input.<div class=footnote-definition id=rop><sup class=footnote-definition-label>1</sup><p><a rel="nofollow noreferrer" href=https://en.wikipedia.org/wiki/Return-oriented_programming>https://en.wikipedia.org/wiki/Return-oriented_programming</a></div><div class=footnote-definition id=ptrace><sup class=footnote-definition-label>2</sup><p><a rel="nofollow noreferrer" href=https://www.man7.org/linux/man-pages/man2/ptrace.2.html>https://www.man7.org/linux/man-pages/man2/ptrace.2.html</a></div></main></div>
