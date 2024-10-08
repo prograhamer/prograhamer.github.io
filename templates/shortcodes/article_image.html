@@ -1,0 +1,10 @@
+{% set image_480 = resize_image(path=path, width=480, op="fit_width") %}
+{% set image_800 = resize_image(path=path, width=800, op="fit_width") %}
+{% set image_1440 = resize_image(path=path, width=1440, op="fit_width") %}
+<img
+    class="article-block"
+    alt="{{ alt }}"
+    srcset="{{ image_480.url }} 480w, {{ image_800.url }} 800w, {{ image_1440.url }} 1440w"
+    sizes="(max-width: 480px) 480px, (max-width: 800px) 800px, 1440px"
+    src="{{ image_800.url }}"
+/>

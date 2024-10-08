@@ -31,6 +31,6 @@ I still want to work on all of the technical skills, to give myself the ability 
 
 Some pictures:
 
-<img src="/images/vulture001.jpg" alt="A turkey vulture flying, having just left its perch" class="article-block" />
+{{ article_image(path="/images/vulture001.jpg", alt="A turkey vulture flying, having just left its perch") }}
 
-<img src="/images/vulture002.jpg" alt="A turkey vulture soars in from the right of the frame" class="article-block" />
+{{ article_image(path="/images/vulture002.jpg", alt="A turkey vulture soars in from the right of the frame") }}
