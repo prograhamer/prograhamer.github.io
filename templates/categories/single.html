@@ -1,5 +1,12 @@
 {% extends "base.html" %}
 
+{% block rss %}
+{% set rss_path = "categories/" ~ term.slug ~ "/rss.xml" %}
+{% set atom_path = "categories/" ~ term.slug ~ "/atom.xml" %}
+<link rel="alternate" type="application/rss+xml" title="RSS Feed" href="{{ get_url(path=rss_path, trailing_slash=false) }}" />
+<link rel="alternate" type="application/atom+xml" title="Atom Feed" href="{{ get_url(path=atom_path, trailing_slash=false) }}" />
+{% endblock rss %}
+
 {% block content %}
 <div class="title">
 	<h1>
