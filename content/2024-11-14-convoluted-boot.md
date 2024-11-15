@@ -662,7 +662,7 @@ fn solve_quadratic(a: u32, b: u32, c: u32) -> Option<u32> {
 
     if c % 2 == 0 {
         solutions.push(0);
-    } else if ((a % 2) + (b % 2) - (c % 2)) % 2 == 0 {
+    } else if ((a % 2) + (b % 2) + (c % 2)) % 2 == 0 {
         solutions.push(1);
     } else {
         return None;
