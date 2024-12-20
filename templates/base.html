@@ -4,7 +4,12 @@
 <head>
   <meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PinkFalcon</title>
+  <title>
+    {% if page.title %}
+    {{ page.title }} -
+    {% endif %}
+    PinkFalcon
+  </title>
   <link rel="stylesheet" href="{{ get_url(path="base.css", trailing_slash=false, cachebust=true) }}" />
   {% block rss %}
     <link rel="alternate" type="application/rss+xml" title="RSS Feed" href="{{ get_url(path="rss.xml", trailing_slash=false) }}" />
@@ -16,7 +21,7 @@
 <body>
 	<div class="gradient">
 		<div class="falcon">
-			<img src="/images/falcon.png" />
+			<img role="presentation" src="/images/falcon.png" />
 		</div>
 	</div>
 	<div class="content">

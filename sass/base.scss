@@ -9,7 +9,11 @@ img.doot {
   height: 120px;
 }
 
-div.toc ul {
+div.skiplink {
+  margin-bottom: 1em;
+}
+
+nav ul {
   padding: 0;
 
   li {
@@ -69,7 +73,7 @@ p.date {
   font-style: italic;
 }
 
-div.front-matter {
+header {
   background-color: rgba(245, 245, 245, 0.6);
   margin: 0 -8px;
   padding: 16px 16px 16px 8px;

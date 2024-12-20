@@ -2,17 +2,17 @@
 
 {% block content %}
 <div class="title">
-	<img class="doot leftdoot" src="/images/doot.gif" />
+	<img role="presentation" alt="An animation of a skull playing the trumpet" class="doot leftdoot" src="/images/doot.gif" />
 	<h1>
 		{{ section.title }}
 	</h1>
-	<img class="doot rightdoot" src="/images/doot.gif" />
+	<img role="presentation" alt="An animation of a skull playing the trumpet" class="doot rightdoot" src="/images/doot.gif" />
 </div>
-<div class="toc">
+<nav aria-label="main">
 	<ul>
 	{% for page in section.pages %}
 	<li><a href="{{page.permalink | safe }}">{{ page.title }}</a></li>
 	{% endfor %}
 	</ul>
-</div>
+</nav>
 {% endblock content %}

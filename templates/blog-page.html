@@ -9,23 +9,28 @@
 {% endblock meta %}
 
 {% block content %}
-<div class="front-matter">
-	<h1 class="title">
-		{{ page.title }}
-	</h1>
-	<div class="subtitle">
-		<div class="description">{{ page.description }}</div>
-		<div class="date">{{ page.date }}</div>
-	</div>
-  {% if page.taxonomies.categories %}
-  <ul class="categories">
-  {% for category in page.taxonomies.categories %}
-  <li><a href={{ get_taxonomy_url(kind="categories", name=category) }}>{{ category }}</a></li>
-  {% endfor %}
-  </ul>
-  {% endif %}
-</div>
-<main>
+<header>
+	<h1 class="title">{{ page.title }}</h1>
+  <div>
+    <div class="skiplink">
+      <a href="#content">Skip to main content</a>
+    </div>
+    <div class="subtitle">
+      <div class="description">{{ page.description }}</div>
+      <div class="date">{{ page.date }}</div>
+    </div>
+    {% if page.taxonomies.categories %}
+    <nav aria-label="categories">
+      <ul class="categories">
+      {% for category in page.taxonomies.categories %}
+      <li><a href={{ get_taxonomy_url(kind="categories", name=category) }}>{{ category }}</a></li>
+      {% endfor %}
+      </ul>
+    </nav>
+    {% endif %}
+  </div>
+</header>
+<main id="content">
 {{ page.content | safe }}
 </main>
 {% endblock content %}

@@ -13,7 +13,7 @@ The only file in the archive downloaded from Hack The Box is a modest 2kb file `
 
 Running `file` on the file gives no hint of its content, just returning `data`. Running `strings` on the file gives quite a lot of useful information, however.
 
-Notably, it contains a string giving a hint at how to run the challenge software in QEMU, as well some strings that look like they might be commands to a bootloader of some sort.
+Notably, it contains a string giving a hint at how to run the challenge software in QEMU, as well as some strings that look like they might be commands to a bootloader of some sort.
 
 ## The Boot ROM
 
