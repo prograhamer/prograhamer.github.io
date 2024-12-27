@@ -117,7 +117,7 @@ I ended up writing a little python program to find the full byte string and appl
 I'm not exactly sure what the patched code is doing, but it's easy enough to compare the original code with the patched. It appears to have replaced the cleanup and return of a function to a call to another function in the copied memory:
 
 Original:
-```asm
+```objdump
     3178:	8b 84 24 e0 00 00 00 	mov    0xe0(%esp),%eax
     317f:	81 c4 bc 00 00 00    	add    $0xbc,%esp
     3185:	5b                   	pop    %ebx
@@ -128,7 +128,7 @@ Original:
 ```
 
 Patched:
-```asm
+```objdump
     3178:	bb 34 ad 09 00       	mov    $0x9ad34,%ebx
     317d:	ff d3                	call   *%ebx
     317f:	eb fe                	jmp    0x317f
@@ -191,7 +191,7 @@ objdump --adjust-vma 0x9ad34 -b binary -m i386 -D -s callback.bin > callback.s
 ```
 
 The code for the function that is triggered directly from the patched kernel code looks as follows:
-```asm
+```objdump
    9ad34:	5e                   	pop    %esi
    9ad35:	be e0 a1 70 00       	mov    $0x70a1e0,%esi
    9ad3a:	b8 9e ad 09 00       	mov    $0x9ad9e,%eax
@@ -359,7 +359,7 @@ To determine if the patch is applied, it examines address `0x80a4479`, comparing
 The patch is applied by xor'ing the function with the data between `0xc009b073` and `0xc009b177`, and then setting the next five bytes to values `e8 e5 61 ff ff`.
 
 This yields the following function at address `0x80a4479`:
-```asm
+```objdump
 080a4479 <.data>:
  80a4479:	83 f8 00             	cmp    $0x0,%eax
  80a447c:	0f 84 f2 00 00 00    	je     0x80a4574

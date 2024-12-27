@@ -4,6 +4,9 @@
   }
 }
 
+@import url("syntax-theme-dark.css") (prefers-color-scheme: dark);
+@import url("syntax-theme-light.css") (prefers-color-scheme: light);
+
 .footnote-definition a {
   overflow-wrap: anywhere;
 }
@@ -121,7 +124,7 @@ pre {
 
   padding: 8px;
   overflow-x: scroll;
-  background-color: rgba(245, 245, 245, 0.8) !important;
+  background-color: rgba(255, 255, 255, 0.8) !important;
 }
 
 pre table td {
@@ -210,5 +213,37 @@ ul.categories {
     margin-right: 1em;
     padding: 4px;
     display: inline;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    color: rgba(239, 156, 239, 1);
+  }
+
+  header {
+    background-color: rgba(17, 17, 17, 0.6);
+  }
+
+  a {
+    color: inherit;
+    background-color: rgba(17, 17, 17, 0.8);
+    padding: 2px 2px 0px 2px;
+    border-bottom: rgba(239, 156, 239, 1) solid 2px;
+  }
+
+  code {
+    background: rgba(17, 17, 17, 0.8);
+  }
+
+  pre {
+    background-color: rgba(17, 17, 17, 0.7) !important;
+  }
+
+  div.gradient {
+    background:
+      linear-gradient(30deg, rgba(17, 17, 17, 0), rgba(17, 17, 17, 1)),
+      linear-gradient(140deg, rgba(17, 17, 17, 0), rgba(17, 17, 17, 1)),
+      linear-gradient(240deg, rgba(17, 17, 17, 0), rgba(17, 17, 17, 1));
   }
 }

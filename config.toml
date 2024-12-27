@@ -26,7 +26,14 @@ taxonomies = [
 # Theme can be customised by setting the `highlight_theme` variable to a theme supported by Zola
 highlight_code = true
 
-highlight_theme = "cheerfully-light"
+highlight_theme = "css"
+
+highlight_themes_css = [
+  { theme = "demain", filename = "syntax-theme-light.css" },
+  { theme = "dracula", filename = "syntax-theme-dark.css" },
+]
+
+extra_syntaxes_and_themes = ["syntaxes"]
 
 render_emoji = true
 
