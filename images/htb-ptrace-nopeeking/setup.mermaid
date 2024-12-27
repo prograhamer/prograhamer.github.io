@@ -1,0 +1,32 @@
+flowchart LR
+    subgraph Parent
+        pStart[Start]
+        pMmap["mmap() shared regions"]
+        pFork["fork()"]
+        pTestTraceePid{Is tracee PID set?}
+        pWait[sleep]
+        pContinue[continue]
+    end
+
+    subgraph Child
+        cStart[Start]
+        cPtraceMe["ptrace() [TRACEME]"]
+        cPtraceAttach["ptrace() [ATTACH]"]
+        cPtracePoketext["ptrace() [POKETEXT]"]
+        cPtraceCont["ptace() [CONT]"]
+        cContinue[continue]
+    end
+
+    pStart-->pMmap
+    pMmap-->pFork
+    pFork-->pTestTraceePid
+    pFork-->cStart
+    pTestTraceePid-->|No|pWait
+    pTestTraceePid-.....->|Yes|pContinue
+    pWait-->pTestTraceePid
+
+    cStart-->cPtraceMe
+    cPtraceMe-->cPtraceAttach
+    cPtraceAttach-->cPtracePoketext
+    cPtracePoketext-->cPtraceCont
+    cPtraceCont-->cContinue
