@@ -1,0 +1,14 @@
+button.sound {
+  border: none;
+  border-radius: 4px;
+  font-size: 100px;
+  background-color: rgba(0,0,0,0)
+}
+
+button.sound:active {
+  border: none;
+  border-radius: 4px;
+  font-size: 100px;
+  background-color: rgba(0,0,0,.2)
+}
+
